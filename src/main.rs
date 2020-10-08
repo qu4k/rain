@@ -12,8 +12,10 @@ mod vec;
 mod camera;
 mod hittable;
 
-use image::{ImageBuffer, Rgb, RgbImage};
+mod window;
 
+use clap::app_from_crate;
+use image::{ImageBuffer, Rgba, RgbaImage};
 use rand::prelude::*;
 
 fn ray_color(
@@ -39,21 +41,48 @@ fn ray_color(
 }
 
 fn main() {
-  let args: Vec<String> = env::args().collect();
-  let desired_height = match args.get(1) {
+  let args = app_from_crate!()
+    .arg("--width [width] 'set width of output image (default 400)'")
+    .arg("--height [height] 'set height of output image (default 255)'")
+    .arg("--spp [spp] 'Samples per pixel (default 1000)'")
+    .arg("--depth [depth] 'Max ray reflection depth (default 50)'")
+    .arg("--window 'Show result in a window (default false)'")
+    .arg("<output> 'Image output'")
+    .get_matches();
+
+  let ar = 16.0 / 9.0;
+
+  let width = match args.value_of("width") {
     Some(arg) => arg.parse::<u32>().unwrap(),
     None => 400,
   };
 
-  // Image
-  let ar = 16.0 / 9.0;
-  let width = desired_height;
-  let height = (width as f64 / ar) as u32;
-  let path = "image.png";
-  let spp = 100;
-  let max_depth = 50;
+  let height = match args.value_of("height") {
+    Some(arg) => arg.parse::<u32>().unwrap(),
+    None => (width as f64 / ar) as u32,
+  };
 
-  let mut img: RgbImage = ImageBuffer::new(width, height);
+  let ar = width as f64 / height as f64;
+
+  let path = match args.value_of("output") {
+    Some(arg) => arg,
+    None => "out.png",
+  };
+
+  let spp = match args.value_of("spp") {
+    Some(arg) => arg.parse::<u32>().unwrap(),
+    None => 100,
+  };
+
+  let max_depth = match args.value_of("depth") {
+    Some(arg) => arg.parse::<u32>().unwrap(),
+    None => 50,
+  };
+
+  let window = args.is_present("window");
+
+  // Image
+  let mut img: RgbaImage = ImageBuffer::new(width, height);
 
   // Camera
   let camera = Camera::new(ar);
@@ -65,7 +94,9 @@ fn main() {
   world.push(Box::new(Sphere::new(Point::new(0., 0., -1.), 0.5)));
   world.push(Box::new(Sphere::new(Point::new(0., -100.5, -1.), 100.)));
 
+  // Rendering
   eprintln!("> Generating image ({}x{}) ...", width, height);
+
   let gen = Instant::now();
 
   for j in (0..height).rev() {
@@ -80,27 +111,23 @@ fn main() {
       }
 
       let pixel = img.get_pixel_mut(i, height - 1 - j);
-      *pixel = Rgb(color.rgb(spp))
+      *pixel = Rgba(color.rgb(spp))
     }
   }
 
-  let gen_time = gen.elapsed().as_millis();
-
   eprintln!();
-  eprintln!("> Took {}ms", gen_time);
+  eprintln!("> Took {}ms", gen.elapsed().as_millis());
   eprintln!();
   eprintln!("Saving image...");
 
-  let saving = Instant::now();
-
+  // Save
   img.save(path).unwrap();
 
-  let saving_time = saving.elapsed().as_millis();
+  eprintln!("Done. ({}ms)", gen.elapsed().as_millis());
 
-  eprintln!(
-    "Done. ({}ms gen + {}ms saving = {}ms)",
-    gen_time,
-    saving_time,
-    gen_time + saving_time
-  );
+  if window {
+    eprintln!("Opening window...");
+    // Render to screen
+    window::display_image(&img);
+  }
 }

@@ -211,7 +211,7 @@ fn clamp(x: f64, min: f64, max: f64) -> f64 {
 }
 
 impl Color {
-  pub fn rgb(&self, spp: u32) -> [u8; 3] {
+  pub fn rgb(&self, spp: u32) -> [u8; 4] {
     let scale = 1. / spp as f64;
 
     // Divide the color by the number of samples and gamma-correct for gamma=2.0.
@@ -223,7 +223,8 @@ impl Color {
     let ir = (256. * clamp(r, 0., 0.999)) as u8; // ir
     let ig = (256. * clamp(g, 0., 0.999)) as u8; // ig
     let ib = (256. * clamp(b, 0., 0.999)) as u8; // ib
+    let ia = 255_u8;
 
-    [ir, ig, ib]
+    [ir, ig, ib, ia]
   }
 }
