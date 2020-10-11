@@ -1,8 +1,8 @@
 use std::env;
 use std::time::Instant;
 
-use rain::hittable::{Hittable, Sphere};
 use rain::material::{Dielectric, Lambertian, Metal};
+use rain::primitive::{Primitive, Sphere};
 use rain::ray::Ray;
 use rain::vec::{Color, Point};
 use rain::{camera::Camera, vec::Vec3};
@@ -13,7 +13,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use rand::prelude::*;
 use rayon::prelude::*;
 
-fn ray_color(ray: &Ray, world: &impl Hittable, depth: u32, rng: &mut impl Rng) -> Color {
+fn ray_color(ray: &Ray, world: &impl Primitive, depth: u32, rng: &mut impl Rng) -> Color {
   if depth == 0 {
     return Color::new(0., 0., 0.);
   }
@@ -33,9 +33,9 @@ fn ray_color(ray: &Ray, world: &impl Hittable, depth: u32, rng: &mut impl Rng) -
   }
 }
 
-fn random_scene(rng: &mut impl Rng) -> Vec<Box<dyn Hittable>> {
+fn random_scene(rng: &mut impl Rng) -> Vec<Box<dyn Primitive>> {
   // World
-  let mut world: Vec<Box<dyn Hittable>> = vec![];
+  let mut world: Vec<Box<dyn Primitive>> = vec![];
 
   // Ground
   world.push(Box::new(Sphere::new(

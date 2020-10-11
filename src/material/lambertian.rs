@@ -1,6 +1,6 @@
 use rand::RngCore;
 
-use crate::{hittable::Hit, ray::Ray, vec::Color, vec::Vec3};
+use crate::{primitive::Hit, ray::Ray, vec::Color, vec::Vec3};
 
 use super::{Material, Scatter};
 

@@ -1,6 +1,6 @@
 use rand::RngCore;
 
-use crate::{hittable::Hit, ray::Ray, vec::Vec3};
+use crate::{primitive::Hit, ray::Ray, vec::Vec3};
 
 mod dielectric;
 mod lambertian;
