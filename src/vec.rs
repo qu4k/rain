@@ -35,6 +35,15 @@ impl Vec3 {
     }
   }
 
+  pub fn random_in_unit_disk(rng: &mut dyn RngCore) -> Self {
+    loop {
+      let p = Vec3::new(rng.gen_range(-1., 1.), rng.gen_range(-1., 1.), 0.);
+      if p.len_squared() < 1.0 {
+        return p;
+      }
+    }
+  }
+
   pub fn random_unit(rng: &mut dyn RngCore) -> Self {
     let a: f64 = rng.gen_range(0., 2. * std::f64::consts::PI);
     let z: f64 = rng.gen_range(-1., 1.);
@@ -80,13 +89,24 @@ impl Vec3 {
   pub fn cross(&self, rhs: &Self) -> Self {
     Self(
       self.1 * rhs.2 - self.2 * rhs.1,
-      self.2 * rhs.0 - self.0 * rhs.2,
-      self.0 * rhs.1 - self.1 - rhs.0,
+      -(self.0 * rhs.2 - self.2 * rhs.0),
+      self.0 * rhs.1 - self.1 * rhs.0,
     )
   }
 
   pub fn unit(&self) -> Self {
     *self / self.len()
+  }
+
+  pub fn reflect(v: &Self, n: &Self) -> Self {
+    (*n) - 2. * v.dot(n) * (*n)
+  }
+
+  pub fn refract(uv: &Self, n: &Self, etai_on_etat: f64) -> Self {
+    let cos_th = ((-*uv).dot(n)).min(1.);
+    let r_perp: Self = etai_on_etat * (*uv + cos_th * *n);
+    let r_prll: Self = -((1. - r_perp.len_squared()).abs()).sqrt() * *n;
+    r_perp + r_prll
   }
 }
 
