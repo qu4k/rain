@@ -1,7 +1,7 @@
 use std::fmt;
 use std::ops;
 
-use rand::Rng;
+use rand::{Rng, RngCore};
 
 pub type Point = Vec3;
 pub type Color = Vec3;
@@ -14,11 +14,11 @@ impl Vec3 {
     Self(x, y, z)
   }
 
-  pub fn random(rng: &mut impl Rng) -> Self {
+  pub fn random(rng: &mut dyn RngCore) -> Self {
     Self(rng.gen(), rng.gen(), rng.gen())
   }
 
-  pub fn random_range(rng: &mut impl Rng, min: f64, max: f64) -> Self {
+  pub fn random_range(rng: &mut dyn RngCore, min: f64, max: f64) -> Self {
     Self(
       rng.gen_range(min, max),
       rng.gen_range(min, max),
@@ -26,7 +26,7 @@ impl Vec3 {
     )
   }
 
-  pub fn random_in_unit_sphere(rng: &mut impl Rng) -> Self {
+  pub fn random_in_unit_sphere(rng: &mut dyn RngCore) -> Self {
     loop {
       let p = 2.0 * Self::random(rng) - Self(1.0, 1.0, 1.0);
       if p.len_squared() < 1.0 {
@@ -35,11 +35,20 @@ impl Vec3 {
     }
   }
 
-  pub fn random_unit(rng: &mut impl Rng) -> Self {
+  pub fn random_unit(rng: &mut dyn RngCore) -> Self {
     let a: f64 = rng.gen_range(0., 2. * std::f64::consts::PI);
     let z: f64 = rng.gen_range(-1., 1.);
     let r = (1. - z.powi(2)).sqrt();
     Self(r * a.cos(), r * a.sin(), z)
+  }
+
+  pub fn random_in_hemisphere(normal: &Vec3, rng: &mut dyn RngCore) -> Self {
+    let in_unit_sphere = Self::random_in_unit_sphere(rng);
+    if in_unit_sphere.dot(normal) > 0. {
+      in_unit_sphere
+    } else {
+      -in_unit_sphere
+    }
   }
 
   pub fn x(&self) -> f64 {
@@ -50,6 +59,10 @@ impl Vec3 {
   }
   pub fn z(&self) -> f64 {
     self.2
+  }
+
+  pub fn is_empty(&self) -> bool {
+    self.len() == 0.
   }
 
   pub fn len(&self) -> f64 {
@@ -211,7 +224,7 @@ fn clamp(x: f64, min: f64, max: f64) -> f64 {
 }
 
 impl Color {
-  pub fn rgb(&self, spp: u32) -> [u8; 4] {
+  pub fn rgb(&self, spp: u32) -> [u8; 3] {
     let scale = 1. / spp as f64;
 
     // Divide the color by the number of samples and gamma-correct for gamma=2.0.
@@ -223,8 +236,7 @@ impl Color {
     let ir = (256. * clamp(r, 0., 0.999)) as u8; // ir
     let ig = (256. * clamp(g, 0., 0.999)) as u8; // ig
     let ib = (256. * clamp(b, 0., 0.999)) as u8; // ib
-    let ia = 255_u8;
 
-    [ir, ig, ib, ia]
+    [ir, ig, ib]
   }
 }

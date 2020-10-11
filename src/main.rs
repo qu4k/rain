@@ -1,36 +1,29 @@
 use std::env;
 use std::time::Instant;
 
-use camera::Camera;
-use hittable::{Hittable, Sphere};
-use ray::Ray;
-use vec::{Color, Point, Vec3};
-
-mod ray;
-mod vec;
-
-mod camera;
-mod hittable;
-
-mod window;
+use rain::camera::Camera;
+use rain::hittable::{Hittable, Sphere};
+use rain::material::Lambertian;
+use rain::ray::Ray;
+use rain::vec::{Color, Point};
 
 use clap::app_from_crate;
-use image::{ImageBuffer, Rgba, RgbaImage};
+use image::{ImageBuffer, RgbImage};
+use indicatif::{ProgressBar, ProgressStyle};
 use rand::prelude::*;
+use rayon::prelude::*;
 
-fn ray_color(
-  ray: &Ray,
-  world: &impl Hittable,
-  depth: u32,
-  rng: &mut impl Rng,
-) -> Color {
+fn ray_color(ray: &Ray, world: &impl Hittable, depth: u32, rng: &mut impl Rng) -> Color {
   if depth == 0 {
     return Color::new(0., 0., 0.);
   }
   match world.hit(ray, 0.001, f64::INFINITY) {
     Some(hit) => {
-      let target = hit.p + hit.normal + Vec3::random_unit(rng);
-      0.5 * ray_color(&Ray::new(hit.p, target - hit.p), world, depth - 1, rng)
+      let scatter = hit.material.scatter(ray, &hit, rng);
+      match scatter.ray {
+        Some(ray) => scatter.color * ray_color(&ray, world, depth - 1, rng),
+        None => Color::new(0., 0., 0.),
+      }
     }
     None => {
       let unit_dir = ray.dir.unit();
@@ -46,7 +39,6 @@ fn main() {
     .arg("--height [height] 'set height of output image (default 255)'")
     .arg("--spp [spp] 'Samples per pixel (default 1000)'")
     .arg("--depth [depth] 'Max ray reflection depth (default 50)'")
-    .arg("--window 'Show result in a window (default false)'")
     .arg("<output> 'Image output'")
     .get_matches();
 
@@ -79,55 +71,69 @@ fn main() {
     None => 50,
   };
 
-  let window = args.is_present("window");
-
-  // Image
-  let mut img: RgbaImage = ImageBuffer::new(width, height);
-
   // Camera
   let camera = Camera::new(ar);
 
-  let mut rng = rand::thread_rng();
-
   // World
   let mut world: Vec<Box<dyn Hittable>> = vec![];
-  world.push(Box::new(Sphere::new(Point::new(0., 0., -1.), 0.5)));
-  world.push(Box::new(Sphere::new(Point::new(0., -100.5, -1.), 100.)));
+  world.push(Box::new(Sphere::new(
+    Point::new(0., 0., -1.),
+    0.5,
+    Lambertian::new(Color::new(0.8, 0.8, 0.0)),
+  )));
+  world.push(Box::new(Sphere::new(
+    Point::new(0., -100.5, -1.),
+    100.,
+    Lambertian::new(Color::new(0.0, 0.8, 0.8)),
+  )));
 
-  // Rendering
   eprintln!("> Generating image ({}x{}) ...", width, height);
 
-  let gen = Instant::now();
+  let render = Instant::now();
 
-  for j in (0..height).rev() {
-    eprint!("\r> Scanlines remaining: {} ", j);
-    for i in 0..width {
-      let mut color = Color::new(0., 0., 0.);
-      for _ in 0..spp {
-        let u = ((i as f64) + rng.gen::<f64>()) / (width - 1) as f64;
-        let v = ((j as f64) + rng.gen::<f64>()) / (height - 1) as f64;
-        let ray = camera.cast(u, v);
-        color += ray_color(&ray, &world, max_depth, &mut rng);
-      }
+  let pb = ProgressBar::new(height.into());
+  pb.set_style(ProgressStyle::default_bar()
+    .template("{spinner:.green} [{elapsed_precise}] [{bar:40.cyan/blue}] {pos}/{len} ({eta})")
+    .progress_chars("##-"));
 
-      let pixel = img.get_pixel_mut(i, height - 1 - j);
-      *pixel = Rgba(color.rgb(spp))
-    }
-  }
+  // Rendering
+  let data: Vec<u8> = (0..height)
+    .into_par_iter()
+    .rev()
+    .map(|j| {
+      let row: Vec<u8> = (0..width)
+        .into_par_iter()
+        .map(|i| {
+          let mut color = Color::new(0., 0., 0.);
+          let mut rng = thread_rng();
+          for _ in 0..spp {
+            let u = ((i as f64) + rng.gen::<f64>()) / (width - 1) as f64;
+            let v = ((j as f64) + rng.gen::<f64>()) / (height - 1) as f64;
+            let ray = camera.cast(u, v);
+            color += ray_color(&ray, &world, max_depth, &mut rng);
+          }
+          color.rgb(spp).to_vec()
+        })
+        .flatten()
+        .collect();
+      pb.inc(1);
+      row
+    })
+    .flatten()
+    .collect();
+  
+  pb.finish_and_clear();
 
-  eprintln!();
-  eprintln!("> Took {}ms", gen.elapsed().as_millis());
+  // Image
+  let mut img: RgbImage = ImageBuffer::new(width, height);
+  img.copy_from_slice(data.as_slice());
+
+  eprintln!("> Took {}ms", render.elapsed().as_millis());
   eprintln!();
   eprintln!("Saving image...");
 
   // Save
   img.save(path).unwrap();
 
-  eprintln!("Done. ({}ms)", gen.elapsed().as_millis());
-
-  if window {
-    eprintln!("Opening window...");
-    // Render to screen
-    window::display_image(&img);
-  }
+  eprintln!("Done. ({}ms)", render.elapsed().as_millis());
 }

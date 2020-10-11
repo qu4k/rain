@@ -1,18 +1,26 @@
 use crate::{
+  material::Material,
   ray::Ray,
   vec::{Point, Vec3},
 };
 
 #[derive(Copy, Clone)]
-pub struct Hit {
+pub struct Hit<'a> {
   pub p: Point,
   pub normal: Vec3,
   pub t: f64,
   pub front_face: bool,
+  pub material: &'a dyn Material,
 }
 
-impl Hit {
-  pub fn new(ray: &Ray, t: f64, p: Point, outward_normal: Vec3) -> Self {
+impl<'a> Hit<'a> {
+  pub fn new(
+    ray: &Ray,
+    t: f64,
+    p: Point,
+    outward_normal: Vec3,
+    material: &'a dyn Material,
+  ) -> Self {
     let front_face = ray.dir.dot(&outward_normal) < 0.;
     let normal = if front_face {
       outward_normal
@@ -24,22 +32,28 @@ impl Hit {
       normal,
       t,
       front_face,
+      material,
     }
   }
 }
 
-pub trait Hittable {
+pub trait Hittable: Sync {
   fn hit(&self, ray: &Ray, t_min: f64, t_max: f64) -> Option<Hit>;
 }
 
 pub struct Sphere {
-  center: Point,
-  radius: f64,
+  pub center: Point,
+  pub radius: f64,
+  pub material: Box<dyn Material>,
 }
 
 impl Sphere {
-  pub fn new(center: Point, radius: f64) -> Self {
-    Self { center, radius }
+  pub fn new(center: Point, radius: f64, material: Box<dyn Material>) -> Self {
+    Self {
+      center,
+      radius,
+      material,
+    }
   }
 }
 
@@ -54,20 +68,24 @@ impl Hittable for Sphere {
       let root = discriminant.sqrt();
       let t = (-half_b - root) / a;
       if t < t_max && t > t_min {
+        let p = ray.at(t);
         return Some(Hit::new(
           ray,
           t,
-          ray.at(t),
-          (ray.at(t) - self.center) / self.radius,
+          p,
+          (p - self.center) / self.radius,
+          &*self.material,
         ));
       }
       let t = (-half_b + root) / a;
       if t < t_max && t > t_min {
+        let p = ray.at(t);
         return Some(Hit::new(
           ray,
           t,
-          ray.at(t),
-          (ray.at(t) - self.center) / self.radius,
+          p,
+          (p - self.center) / self.radius,
+          &*self.material,
         ));
       }
     }

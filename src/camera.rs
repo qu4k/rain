@@ -19,8 +19,7 @@ impl Camera {
     let origin = Point::new(0., 0., 0.);
     let horizontal = Vec3::new(viewport_width, 0., 0.);
     let vertical = Vec3::new(0., viewport_height, 0.);
-    let lower_left_corner =
-      origin - horizontal / 2. - vertical / 2. - Vec3::new(0., 0., focal_len);
+    let lower_left_corner = origin - horizontal / 2. - vertical / 2. - Vec3::new(0., 0., focal_len);
 
     Self {
       origin,
@@ -32,8 +31,7 @@ impl Camera {
   pub fn cast(&self, u: f64, v: f64) -> Ray {
     Ray::new(
       self.origin,
-      self.lower_left_corner + u * self.horizontal + v * self.vertical
-        - self.origin,
+      self.lower_left_corner + u * self.horizontal + v * self.vertical - self.origin,
     )
   }
 }

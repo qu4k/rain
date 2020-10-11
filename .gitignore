@@ -1,1 +1,5 @@
+# ide
+.vscode
+
+# rust build
 /target

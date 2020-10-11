@@ -13,7 +13,7 @@
 </div>
 
 <kbd>
-  <img src="image.png" alt="Sample">
+  <img src="assets/image.png" alt="Sample">
 </kbd>
 
 ## Maintainers
